@@ -1,0 +1,3 @@
+2026-05-09 21:23:42 [info     ] tokenledger.starting
+2026-05-09 21:23:42 [info     ] tokenledger.db_pool_ready
+INFO:     127.0.0.1:12189 - "GET /ready HTTP/1.1" 200 OK

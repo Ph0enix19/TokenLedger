@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+groq
+psycopg[binary]
+psycopg-pool
+aiosqlite
+structlog
+tiktoken
+pytest
