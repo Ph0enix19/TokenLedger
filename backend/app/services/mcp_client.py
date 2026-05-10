@@ -25,7 +25,6 @@ async def call_mcp_tool(tool_name: str, arguments: dict) -> str | None:
     Returns None on any failure - tool call failure is non-fatal.
     """
     url = f"{settings.mcp_server_url.rstrip('/')}/mcp"
-
     try:
         async with streamablehttp_client(url, timeout=5.0) as (
             read_stream,
