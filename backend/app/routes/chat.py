@@ -19,6 +19,9 @@ from app.middleware.pii_detector import detect_and_redact
 from app.services.llm import call_llm
 from app.services.cost import calculate_cost_myr
 from app.services.audit import log_request
+from app.services.cache_service import cache_lookup, cache_store
+from app.services.router import route
+from app.services.mcp_client import call_mcp_tool, MCP_TOOL_TRIGGERS
 
 router = APIRouter()
 settings = get_settings()
@@ -75,17 +78,46 @@ async def chat(
             },
         )
 
-    # ── Step 2: Semantic cache (stub — always miss today) ─────────────
-    trace.cache_hit = False
+    # ── Step 2: Semantic cache ─────────────────────────────────────────
+    cached_response = await cache_lookup(request.prompt)
+    if cached_response:
+        trace.cache_hit = True
+        trace.model_used = "cache"
+        trace.route_reason = "cache_hit"
+        trace.latency_ms = int((time.perf_counter() - t_total_start) * 1000)
 
-    # ── Step 3: Model routing (stub — always small model today) ───────
-    model = settings.small_model
+        await log_request(
+            prompt=request.prompt,
+            trace=trace,
+            user_id=request.user_id,
+            pii_flags=[],
+            outcome="allowed",
+            prompt_redacted=request.prompt,
+        )
+
+        return ChatResponse(
+            response=cached_response,
+            trace=trace,
+        )
+
+    # ── Step 3: Model routing ──────────────────────────────────────────
+    model, route_reason = route(request.prompt)
     trace.model_used = model
-    trace.route_reason = "default_stub_saturday"
+    trace.route_reason = route_reason
+
+    # ── Step 3b: MCP tool trigger detection ───────────────────────────
+    mcp_context = ""
+    for trigger, tool_name, tool_args_fn in MCP_TOOL_TRIGGERS:
+        if trigger in request.prompt.lower():
+            tool_result = await call_mcp_tool(tool_name, tool_args_fn(request.prompt))
+            if tool_result:
+                mcp_context = f"\n\n[Internal data from {tool_name}]:\n{tool_result}\n"
+                trace.tool_calls.append({"tool": tool_name, "trigger": trigger})
+            break
 
     # ── Step 4: LLM call ──────────────────────────────────────────────
     llm_result = await call_llm(
-        prompt=request.prompt,
+        prompt=request.prompt + mcp_context,
         model=model,
         max_tokens=request.max_tokens,
     )
@@ -93,6 +125,9 @@ async def chat(
     trace.input_tokens = llm_result["input_tokens"]
     trace.output_tokens = llm_result["output_tokens"]
     trace.latency_ms = llm_result["latency_ms"]
+
+    # ── Step 4b: Store successful response in cache ────────────────────
+    await cache_store(request.prompt, llm_result["response"])
 
     # ── Step 5: Cost calculation ───────────────────────────────────────
     trace.cost_myr = calculate_cost_myr(
