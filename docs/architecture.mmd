@@ -1,0 +1,9 @@
+flowchart LR
+  dashboard[Client Dashboard] --> gateway[FastAPI Gateway]
+  gateway --> pii[PII Detector]
+  pii --> router[Semantic Cache / Router]
+  router --> groq[Groq LLM]
+  router --> mcp[MCP Server]
+  mcp --> postgres[Postgres]
+  router --> ollama[Ollama Embeddings]
+  gateway --> postgres
