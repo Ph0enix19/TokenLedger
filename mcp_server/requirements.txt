@@ -1,0 +1,5 @@
+mcp[cli]>=1.27
+psycopg[asyncio,binary]>=3.2.1
+pydantic>=2.8.0
+structlog>=24.4.0
+python-dotenv>=1.0.1
