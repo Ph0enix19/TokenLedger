@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     large_model_input_usd: float = 0.59
     large_model_output_usd: float = 0.79
     usd_to_myr: float = 4.7
+    mcp_server_url: str = "http://127.0.0.1:8001"
 
     class Config:
         env_file = ".env"
