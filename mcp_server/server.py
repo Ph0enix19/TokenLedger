@@ -15,13 +15,13 @@ Run: python mcp_server/server.py
 Port: 8001 (streamable-http transport)
 """
 import os
-import re
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 import psycopg
 from psycopg.rows import dict_row
 from mcp.server.fastmcp import FastMCP
 import structlog
+from docs_search import query_keywords, search_corpus_files
 
 logger = structlog.get_logger()
 
@@ -50,6 +50,8 @@ class ModelBreakdown(BaseModel):
 
 
 class CostSummary(BaseModel):
+    currency: str = "MYR"
+    currency_display: str = "Malaysian ringgit (RM)"
     period_days: int
     total_requests: int
     total_cost_myr: float
@@ -65,6 +67,8 @@ class DocHit(BaseModel):
 
 class BudgetStatus(BaseModel):
     team: str
+    currency: str = "MYR"
+    currency_display: str = "Malaysian ringgit (RM)"
     monthly_cap_myr: float
     spent_myr: float
     remaining_myr: float
@@ -78,23 +82,6 @@ TEAM_BUDGETS = {
     "default": 100.0,
 }
 
-STOP_WORDS = {
-    "a",
-    "an",
-    "are",
-    "did",
-    "for",
-    "is",
-    "me",
-    "of",
-    "the",
-    "this",
-    "to",
-    "we",
-    "what",
-}
-
-
 def _db():
     return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=5)
 
@@ -102,8 +89,9 @@ def _db():
 @mcp.tool()
 async def get_cost_summary(days: int = 7) -> CostSummary:
     """
-    Returns total AI infrastructure cost in MYR, per-model breakdown,
-    and cache statistics for the trailing N days.
+    Returns total AI infrastructure cost in MYR, Malaysian ringgit,
+    per-model breakdown, and cache statistics for the trailing N days.
+    MYR is a currency code, not a multiplier or "million" suffix.
     Use this to answer any question about AI spend, cost, or usage.
     """
     logger.info("mcp.get_cost_summary", days=days)
@@ -164,53 +152,57 @@ async def search_internal_docs(query: str, k: int = 3) -> list[DocHit]:
     Searches Acme Corp internal documents (policies, runbooks, OKRs).
     Returns the top-k most relevant chunks.
     Use this for questions about company policy, on-call, expenses, or deployments.
+    Falls back to bundled corpus/*.md files when the documents index is empty.
     """
     logger.info("mcp.search_internal_docs", query=query)
-    keywords = [
-        word
-        for word in re.findall(r"[a-z0-9]+", query.lower())
-        if len(word) > 2 and word not in STOP_WORDS
-    ]
+    keywords = query_keywords(query)
 
-    conn = _db()
     try:
-        if keywords:
-            where_parts = []
-            score_parts = []
-            where_params = []
-            score_params = []
-            for keyword in keywords:
-                pattern = f"%{keyword}%"
-                where_parts.append("(LOWER(source) LIKE %s OR LOWER(chunk) LIKE %s)")
-                score_parts.append(
-                    "(CASE WHEN LOWER(source) LIKE %s OR LOWER(chunk) LIKE %s THEN 1 ELSE 0 END)"
-                )
-                where_params.extend([pattern, pattern])
-                score_params.extend([pattern, pattern])
+        conn = _db()
+        try:
+            if keywords:
+                where_parts = []
+                score_parts = []
+                where_params = []
+                score_params = []
+                for keyword in keywords:
+                    pattern = f"%{keyword}%"
+                    where_parts.append("(LOWER(source) LIKE %s OR LOWER(chunk) LIKE %s)")
+                    score_parts.append(
+                        "(CASE WHEN LOWER(source) LIKE %s OR LOWER(chunk) LIKE %s THEN 1 ELSE 0 END)"
+                    )
+                    where_params.extend([pattern, pattern])
+                    score_params.extend([pattern, pattern])
 
-            cur = conn.execute(
-                f"""
-                SELECT source, chunk FROM documents
-                WHERE {" OR ".join(where_parts)}
-                ORDER BY {" + ".join(score_parts)} DESC, source ASC
-                LIMIT %s
-                """,
-                (*where_params, *score_params, k),
-            )
-        else:
-            cur = conn.execute(
-                """
-                SELECT source, chunk FROM documents
-                WHERE LOWER(chunk) LIKE %s
-                LIMIT %s
-                """,
-                (f"%{query.lower()}%", k),
-            )
-        rows = cur.fetchall()
-    finally:
-        conn.close()
+                cur = conn.execute(
+                    f"""
+                    SELECT source, chunk FROM documents
+                    WHERE {" OR ".join(where_parts)}
+                    ORDER BY {" + ".join(score_parts)} DESC, source ASC
+                    LIMIT %s
+                    """,
+                    (*where_params, *score_params, k),
+                )
+            else:
+                cur = conn.execute(
+                    """
+                    SELECT source, chunk FROM documents
+                    WHERE LOWER(chunk) LIKE %s
+                    LIMIT %s
+                    """,
+                    (f"%{query.lower()}%", k),
+                )
+            rows = cur.fetchall()
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning("mcp.search_internal_docs.db_failed", error=str(e))
+        rows = []
 
     if not rows:
+        file_hits = search_corpus_files(query, k=k)
+        if file_hits:
+            return [DocHit(source=hit.source, chunk=hit.chunk) for hit in file_hits]
         return [DocHit(source="no_results", chunk=f"No documents found for: {query}")]
 
     return [DocHit(source=r["source"], chunk=r["chunk"]) for r in rows]
@@ -220,6 +212,7 @@ async def search_internal_docs(query: str, k: int = 3) -> list[DocHit]:
 async def check_budget_limit(team: str = "engineering") -> BudgetStatus:
     """
     Returns the current month's AI spend vs budget cap for the specified team.
+    All monetary values are MYR, Malaysian ringgit, not millions.
     Use this for questions like 'are we over budget?' or 'how much AI budget is left?'
     Valid team names: engineering, product, data.
     """

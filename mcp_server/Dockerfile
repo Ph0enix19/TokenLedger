@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN python -m pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-COPY server.py .
+COPY server.py docs_search.py .
 
 EXPOSE 8001
 

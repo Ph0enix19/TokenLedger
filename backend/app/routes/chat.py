@@ -58,6 +58,8 @@ async def chat(
         flags = [m.pattern_name for m in pii_matches]
         trace.pii_detected = True
         trace.pii_flags = flags
+        trace.model_used = "blocked"
+        trace.route_reason = "blocked_by_pii_scan"
 
         # Log the blocked attempt before returning
         await log_request(

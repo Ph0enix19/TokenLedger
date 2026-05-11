@@ -59,11 +59,21 @@ async def get_stats():
 
         model_cur = await conn.execute(
             """
-            SELECT model_used AS model, COUNT(*) AS requests
-            FROM request_log
-            WHERE created_at >= NOW() - INTERVAL '24 hours'
-            GROUP BY model_used
-            ORDER BY requests DESC, model_used ASC
+            SELECT
+              CASE
+                WHEN a.outcome = 'blocked'
+                  AND (r.model_used IS NULL OR r.model_used = '' OR r.model_used = 'unknown')
+                  THEN 'blocked'
+                WHEN r.model_used IS NULL OR r.model_used = '' OR r.model_used = 'unknown'
+                  THEN 'unrouted'
+                ELSE r.model_used
+              END AS model,
+              COUNT(*) AS requests
+            FROM request_log r
+            LEFT JOIN audit_log a ON a.request_id = r.id
+            WHERE r.created_at >= NOW() - INTERVAL '24 hours'
+            GROUP BY model
+            ORDER BY requests DESC, model ASC
             """,
             (),
         )
@@ -80,7 +90,7 @@ async def get_stats():
         "p95_latency_ms_24h": int(round(_num(latency["p95"]))),
         "requests_by_model_24h": [
             {
-                "model": row["model"] or "unknown",
+                "model": row["model"] or "unrouted",
                 "requests": int(row["requests"] or 0),
             }
             for row in model_rows

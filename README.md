@@ -1,72 +1,108 @@
 # TokenLedger
 
-Real-time cost tracking and controls for AI infrastructure.
+TokenLedger is an AI gateway and observability dashboard for governed LLM usage. Applications send prompts to one FastAPI endpoint, and TokenLedger handles API-key checks, PII blocking, model routing, semantic cache lookup, optional MCP tool context, cost calculation, and audit logging before returning a response.
 
-TokenLedger is a governed AI gateway. Applications call one FastAPI endpoint, and the gateway handles API-key checks, PII blocking, model routing, semantic cache lookup, optional MCP tool context, cost calculation, and audit logging before returning the model response.
+The project includes a polished Next.js dashboard for live operations: gateway status, spend, latency, model routing, cache behavior, policy outcomes, request traces, and audit evidence.
 
-## Problem
+## Features
 
-LLM usage often spreads across scripts, prototypes, and product services before teams can answer basic operational questions: what did we spend today, which model handled a request, did sensitive data get blocked, and can we prove what happened later?
-
-## What TokenLedger Does
-
-- Routes chat requests through a single FastAPI gateway on port `8000`.
-- Blocks prompts with detected PII or secrets before they reach the LLM.
-- Tracks token usage, latency, model choice, cache hits, route reason, and MYR cost.
-- Stores request and audit rows in Postgres with pgvector support.
-- Uses Ollama embeddings locally for semantic cache and corpus indexing.
-- Calls a separate MCP server on port `8001` for governed internal tools.
-- Provides a React dashboard for live metrics, chat playground, pipeline trace, and audit review.
-
-## Architecture
-
-```mermaid
-flowchart LR
-  A[Client Dashboard] --> B[FastAPI Gateway]
-  B --> C[PII Detector]
-  C --> D[Semantic Cache / Router]
-  D --> E[Groq LLM]
-  D --> F[MCP Server]
-  F --> G[Postgres]
-  D --> H[Ollama Embeddings]
-  B --> G
-```
-
-The MCP server is a separate process. The gateway calls it through `MCP_SERVER_URL`; the LLM never receives database credentials.
-
-## Current Features
-
-- `POST /v1/chat` with `X-API-Key` protection.
-- `GET /v1/audit?limit=20` with request metadata joined into audit rows.
-- `GET /v1/dashboard/stats` for cost today, requests today, cache hit rate, p95 latency, and model breakdown.
-- `GET /v1/dashboard/timeseries?metric=cost&days=7` for simple daily points.
-- Tool triggers:
+- FastAPI gateway on port `8000` with `POST /v1/chat`.
+- API-key protection through the `X-API-Key` header.
+- PII and secret detection before model calls.
+- Model routing between small and large Groq models.
+- Semantic cache hooks backed by Postgres and pgvector.
+- MCP server on port `8001` for governed internal tools:
   - `@cost` calls `get_cost_summary`
   - `@docs` calls `search_internal_docs`
   - `@budget` calls `check_budget_limit`
-- React + Vite + Tailwind dashboard in `frontend/`.
-- Dockerfiles for backend and MCP server.
-- Existing `docker-compose.yml` remains Postgres-only.
-- New `docker-compose.full.yml` runs Postgres, backend, and MCP server together.
+- Audit log and dashboard metrics:
+  - `GET /v1/audit?limit=20`
+  - `GET /v1/dashboard/stats`
+  - `GET /v1/dashboard/timeseries?metric=cost&days=7`
+- Next.js dashboard with:
+  - Collapsible responsive sidebar
+  - Backend and database readiness indicators
+  - Cost, request, cache, and latency metric cards
+  - Model usage and cost trend charts
+  - Chat playground
+  - Pipeline trace
+  - Audit table and request detail panel
+  - Light and dark themes with persisted preference
 
 ## Tech Stack
+
+Backend:
 
 - FastAPI
 - psycopg3 and psycopg-pool
 - Postgres with pgvector
 - Groq LLM API
-- Ollama at `http://localhost:11434`
-- Embedding model: `nomic-embed-text`
+- Ollama embeddings at `http://localhost:11434`
 - MCP Python SDK
-- React, Vite, TypeScript, Tailwind, Recharts
 
-## Local Quickstart
+Frontend:
 
-1. Create local env files:
+- Next.js App Router
+- React and TypeScript
+- Tailwind CSS v4
+- Recharts
+- Lucide icons
+- Next API routes as a backend-for-frontend proxy
+
+## Architecture
+
+```mermaid
+flowchart LR
+  A[Next.js Dashboard] --> B[Next API Proxy]
+  B --> C[FastAPI Gateway]
+  C --> D[PII Detector]
+  D --> E[Semantic Cache and Router]
+  E --> F[Groq LLM]
+  E --> G[MCP Server]
+  G --> H[Postgres + pgvector]
+  E --> I[Ollama Embeddings]
+  C --> H
+```
+
+The dashboard does not call the FastAPI API key directly from browser code. It calls `frontend/src/app/api/tokenledger/*`; those server-side Next routes forward requests to the backend and inject `TOKENLEDGER_API_KEY`.
+
+## Ports
+
+- Next.js dashboard: `3000`
+- FastAPI gateway: `8000`
+- MCP server: `8001`
+- Postgres host port: `15433`
+- Ollama default: `11434`
+
+## Environment Variables
+
+Backend `.env`:
+
+```env
+GROQ_API_KEY=your-groq-key
+DATABASE_URL=postgresql://tokenledger:tokenledger@localhost:15433/tokenledger
+FALLBACK_TO_SQLITE=false
+ENVIRONMENT=development
+API_KEY=dev-secret-key-123
+MCP_SERVER_URL=http://127.0.0.1:8001
+```
+
+Frontend `.env.local`:
+
+```env
+TOKENLEDGER_BACKEND=http://127.0.0.1:8000
+TOKENLEDGER_API_KEY=dev-secret-key-123
+```
+
+Keep `TOKENLEDGER_API_KEY` server-side. The current dashboard uses Next API routes so the demo key is not exposed through client-side environment variables.
+
+## Local Setup
+
+1. Create env files:
 
 ```powershell
 Copy-Item .env.example backend/.env
-Copy-Item frontend/.env.example frontend/.env
+Copy-Item frontend/.env.example frontend/.env.local
 ```
 
 2. Edit `backend/.env` and set a real `GROQ_API_KEY`.
@@ -77,14 +113,21 @@ Copy-Item frontend/.env.example frontend/.env
 docker compose up -d
 ```
 
-4. Apply the schema if the database is new:
+4. Apply the database schema if needed:
 
 ```powershell
-docker ps
-docker exec -i <postgres_container_name> psql -U tokenledger -d tokenledger < migrations/001_init.sql
+docker compose cp migrations/001_init.sql postgres:/tmp/001_init.sql
+docker compose exec -T postgres psql -U tokenledger -d tokenledger -f /tmp/001_init.sql
 ```
 
-5. Start the backend:
+5. Start the MCP server:
+
+```powershell
+$env:DATABASE_URL="postgresql://tokenledger:tokenledger@localhost:15433/tokenledger"
+python mcp_server/server.py
+```
+
+6. Start the backend:
 
 ```powershell
 cd backend
@@ -96,25 +139,31 @@ $env:MCP_SERVER_URL="http://127.0.0.1:8001"
 python run.py
 ```
 
-6. Start the MCP server:
-
-```powershell
-$env:DATABASE_URL="postgresql://tokenledger:tokenledger@localhost:15433/tokenledger"
-python mcp_server/server.py
-```
-
-7. Start the dashboard:
+7. Start the frontend:
 
 ```powershell
 cd frontend
 npm install
-Copy-Item .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:5173/`.
+Open `http://localhost:3000`.
 
-## PowerShell Demo Commands
+## Frontend Commands
+
+Run these from `frontend/`:
+
+```powershell
+npm install
+npm run dev
+npm run build
+npm run preview
+npm run lint
+```
+
+`npm run dev` starts Next.js on `http://localhost:3000`. `npm run build` creates a production build. `npm run preview` runs the built app with `next start` after a successful build.
+
+## Backend Smoke Commands
 
 Health:
 
@@ -122,27 +171,22 @@ Health:
 Invoke-RestMethod "http://127.0.0.1:8000/health"
 ```
 
-Normal chat:
+Readiness:
 
 ```powershell
-$headers = @{ "X-API-Key" = "dev-secret-key-123" }
-$body = @{
-  prompt = "Give me a short explanation of TokenLedger"
-  user_id = "demo"
-  max_tokens = 120
-} | ConvertTo-Json
+Invoke-RestMethod "http://127.0.0.1:8000/ready"
+```
 
-Invoke-RestMethod `
-  -Uri "http://127.0.0.1:8000/v1/chat" `
-  -Method POST `
-  -Headers $headers `
-  -ContentType "application/json" `
-  -Body $body
+Dashboard stats:
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:8000/v1/dashboard/stats"
 ```
 
 PII block:
 
 ```powershell
+$headers = @{ "X-API-Key" = "dev-secret-key-123" }
 $body = @{
   prompt = "my email is test@example.com"
   user_id = "demo"
@@ -157,78 +201,49 @@ Invoke-RestMethod `
   -Body $body
 ```
 
-Dashboard stats:
+## Theme Support
 
-```powershell
-Invoke-RestMethod "http://127.0.0.1:8000/v1/dashboard/stats"
-```
+The dashboard supports polished light and dark themes:
 
-Audit log:
+- The initial theme respects the operating system preference.
+- A visible theme toggle is available in the header.
+- User preference is saved to `localStorage` as `tokenledger-theme`.
+- Theme tokens are defined in `frontend/src/app/globals.css`.
+- Cards, tables, forms, badges, charts, sidebar, and headers are theme-aware.
 
-```powershell
-Invoke-RestMethod "http://127.0.0.1:8000/v1/audit?limit=10"
-```
+## Screenshots
 
-## MCP Demo Flow
+Add current screenshots here after running the local dashboard:
 
-Run the MCP server first, then send prompts through `/v1/chat`:
-
-```powershell
-$body = @{
-  prompt = "@cost give me this week's AI spend"
-  user_id = "demo"
-  max_tokens = 180
-} | ConvertTo-Json
-
-Invoke-RestMethod `
-  -Uri "http://127.0.0.1:8000/v1/chat" `
-  -Method POST `
-  -Headers $headers `
-  -ContentType "application/json" `
-  -Body $body
-```
-
-Try `@docs what is the remote work policy?` after running `scripts/index_corpus.py`.
-
-## Dashboard Screenshots
-
-Placeholder: add screenshots here after capturing the local dashboard at `http://localhost:5173/`.
-
-## Evaluation Summary
-
-See [docs/eval.md](docs/eval.md). Current evaluation is manual smoke testing; no measured benchmark numbers are claimed in this README.
+- Dashboard overview
+- Chat playground and pipeline trace
+- Audit log table
+- Light mode
+- Dark mode
 
 ## Deployment Notes
 
-See [docs/deployment.md](docs/deployment.md).
+Backend services can be deployed separately from the frontend. For a hosted frontend, set:
 
-Key ports:
-
-- FastAPI gateway: `8000`
-- MCP server: `8001`
-- Postgres through Docker on host: `15433`
-- Ollama local default: `11434`
-
-For local containers:
-
-```powershell
-docker compose -f docker-compose.full.yml up --build
+```env
+TOKENLEDGER_BACKEND=https://your-backend-url
+TOKENLEDGER_API_KEY=your-server-side-demo-key
 ```
 
-Migrations are manual. Apply `migrations/001_init.sql` before using a fresh database.
+For hosted backends, do not point `MCP_SERVER_URL` at `127.0.0.1` unless the MCP server runs in the same environment. Deploy MCP separately and set a reachable URL.
 
-## Known Limitations
+## Known Limitations and Future Improvements
 
-- The demo frontend exposes `VITE_API_KEY`; that is acceptable for local demos only.
-- Render or other hosted backends cannot reach `127.0.0.1:8001` on your laptop. Deploy MCP separately and set `MCP_SERVER_URL` to a reachable URL for hosted tool calls.
-- Ollama is local. Deployed semantic cache and corpus indexing need a reachable embedding service.
 - Migrations are manual SQL files; there is no migration runner yet.
-- MCP failures are intentionally non-fatal, so tool context may be skipped when the MCP server is unavailable.
+- MCP failures are intentionally non-fatal, so tool context may be skipped when MCP is unavailable.
+- Ollama is local by default; hosted semantic cache and corpus indexing need a reachable embedding service.
+- The demo API key is suitable for local demos only. Production should use real user auth and scoped backend tokens.
+- The frontend currently shows operational data from existing backend endpoints; richer drill-down views can be added as backend analytics expand.
 
-## Interview Talking Points
+## Demo Talking Points
 
-- TokenLedger turns AI usage into an auditable gateway instead of scattered provider calls.
-- The request trace makes cost, routing, latency, cache, and tool behavior inspectable.
-- PII blocking happens before model calls, reducing data exposure risk.
-- MCP is isolated as a separate process with its own database access boundary.
-- The dashboard proves behavior live: normal request, blocked request, cache hit, model route, and audit evidence.
+- TokenLedger turns scattered LLM calls into a governed gateway.
+- PII scanning happens before model calls.
+- Cost, latency, cache, model choice, and MCP tool calls are visible in the request trace.
+- Audit rows prove both allowed and blocked outcomes.
+- The dashboard is built for live infrastructure demos, not static screenshots.

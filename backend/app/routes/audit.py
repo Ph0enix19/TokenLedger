@@ -31,6 +31,15 @@ def _serialize(value: Any) -> Any:
     return value
 
 
+def _model_used(row: Any) -> str | None:
+    model = row["model_used"]
+    if row["outcome"] == "blocked" and (not model or model == "unknown"):
+        return "blocked"
+    if not model or model == "unknown":
+        return "unrouted"
+    return model
+
+
 @router.get("/audit")
 async def get_audit(limit: int = 20):
     limit = max(1, min(limit, 100))
@@ -72,7 +81,7 @@ async def get_audit(limit: int = 20):
                 "pii_flags": _json_list(row["pii_flags"]),
                 "outcome": row["outcome"],
                 "created_at": _serialize(row["created_at"]),
-                "model_used": row["model_used"],
+                "model_used": _model_used(row),
                 "cache_hit": row["cache_hit"],
                 "route_reason": row["route_reason"],
                 "cost_myr": _serialize(row["cost_myr"]),

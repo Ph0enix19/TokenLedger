@@ -22,12 +22,12 @@ Use a managed Postgres instance with pgvector support. Apply `migrations/001_ini
 Create a Vercel project from `frontend/`.
 
 - Build command: `npm run build`
-- Output directory: `dist`
+- Framework preset: Next.js
 - Env vars:
-  - `VITE_API_URL=https://<your-render-backend>`
-  - `VITE_API_KEY=<demo-api-key>`
+  - `TOKENLEDGER_BACKEND=https://<your-render-backend>`
+  - `TOKENLEDGER_API_KEY=<demo-api-key>`
 
-The Vite API key is visible in the browser. For production, replace this with a real user auth flow or a backend-for-frontend pattern.
+The frontend proxies requests through Next API routes so the demo API key stays server-side. For production, replace the demo key with real user auth and a scoped backend token.
 
 ## MCP Server
 

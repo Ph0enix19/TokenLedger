@@ -9,6 +9,13 @@ from app.config import get_settings
 settings = get_settings()
 _client: AsyncGroq | None = None
 
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a helpful AI assistant for an engineering team. "
+    "For TokenLedger cost and budget answers, MYR means Malaysian ringgit "
+    "and fields ending in _myr are currency amounts, not values in millions. "
+    "Format currency as RM <amount> or MYR <amount>."
+)
+
 
 def get_groq_client() -> AsyncGroq:
     global _client
@@ -20,7 +27,7 @@ def get_groq_client() -> AsyncGroq:
 async def call_llm(
     prompt: str,
     model: str,
-    system_prompt: str = "You are a helpful AI assistant for an engineering team.",
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
     max_tokens: int = 1024,
 ) -> dict:
     """
