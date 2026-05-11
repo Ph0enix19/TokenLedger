@@ -91,7 +91,7 @@ cd backend
 .\.venv\Scripts\Activate.ps1
 $env:GROQ_API_KEY="YOUR_GROQ_KEY"
 $env:API_KEY="dev-secret-key-123"
-$env:DATABASE_URL="postgresql://tokenledger:tokenledger@localhost:5433/tokenledger"
+$env:DATABASE_URL="postgresql://tokenledger:tokenledger@localhost:15433/tokenledger"
 $env:MCP_SERVER_URL="http://127.0.0.1:8001"
 python run.py
 ```
@@ -99,7 +99,7 @@ python run.py
 6. Start the MCP server:
 
 ```powershell
-$env:DATABASE_URL="postgresql://tokenledger:tokenledger@localhost:5433/tokenledger"
+$env:DATABASE_URL="postgresql://tokenledger:tokenledger@localhost:15433/tokenledger"
 python mcp_server/server.py
 ```
 
@@ -206,7 +206,7 @@ Key ports:
 
 - FastAPI gateway: `8000`
 - MCP server: `8001`
-- Postgres through Docker on host: `5433`
+- Postgres through Docker on host: `15433`
 - Ollama local default: `11434`
 
 For local containers:

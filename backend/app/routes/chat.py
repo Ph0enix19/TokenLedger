@@ -78,15 +78,33 @@ async def chat(
             },
         )
 
+    # ── Step 1b: MCP tool trigger detection ───────────────────────────
+    # Runs before cache check because MCP tools return live data
+    # that must not be served stale.
+    mcp_context = ""
+    mcp_triggered = False
+    for trigger, tool_name, tool_args_fn in MCP_TOOL_TRIGGERS:
+        if trigger in request.prompt.lower():
+            mcp_triggered = True
+            tool_result = await call_mcp_tool(tool_name, tool_args_fn(request.prompt))
+            if tool_result:
+                mcp_context = f"\n\n[Internal data from {tool_name}]:\n{tool_result}\n"
+                trace.tool_calls.append({"tool": tool_name, "trigger": trigger})
+            break
+
     # ── Step 2: Semantic cache ─────────────────────────────────────────
     cached_response = await cache_lookup(request.prompt)
-    if cached_response:
+    if cached_response and not (mcp_triggered and not mcp_context):
         trace.cache_hit = True
         trace.model_used = "cache"
         trace.route_reason = "cache_hit"
         trace.latency_ms = int((time.perf_counter() - t_total_start) * 1000)
 
-        await log_request(
+        # If an MCP tool fired, we have live context — return that instead of
+        # the cached LLM response, so the answer reflects current data.
+        final_response = mcp_context.strip() if mcp_context else cached_response
+
+        request_id = await log_request(
             prompt=request.prompt,
             trace=trace,
             user_id=request.user_id,
@@ -96,24 +114,15 @@ async def chat(
         )
 
         return ChatResponse(
-            response=cached_response,
+            response=final_response,
             trace=trace,
+            request_id=request_id,
         )
 
     # ── Step 3: Model routing ──────────────────────────────────────────
     model, route_reason = route(request.prompt)
     trace.model_used = model
     trace.route_reason = route_reason
-
-    # ── Step 3b: MCP tool trigger detection ───────────────────────────
-    mcp_context = ""
-    for trigger, tool_name, tool_args_fn in MCP_TOOL_TRIGGERS:
-        if trigger in request.prompt.lower():
-            tool_result = await call_mcp_tool(tool_name, tool_args_fn(request.prompt))
-            if tool_result:
-                mcp_context = f"\n\n[Internal data from {tool_name}]:\n{tool_result}\n"
-                trace.tool_calls.append({"tool": tool_name, "trigger": trigger})
-            break
 
     # ── Step 4: LLM call ──────────────────────────────────────────────
     llm_result = await call_llm(
