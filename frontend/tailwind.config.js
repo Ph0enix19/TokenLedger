@@ -17,6 +17,9 @@ export default {
           rose: "#fb7185",
         },
       },
+      boxShadow: {
+        ledger: "0 20px 50px rgba(2, 6, 23, 0.24)",
+      },
     },
   },
   plugins: [],
