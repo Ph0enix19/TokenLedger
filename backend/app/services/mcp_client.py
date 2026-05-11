@@ -9,13 +9,20 @@ Tool trigger detection:
   Prompt contains "@docs"   -> search_internal_docs(query=<rest of prompt>)
   Prompt contains "@budget" -> check_budget_limit(team="engineering")
 """
+import re
+
 import structlog
 from app.config import get_settings
+from app.services.mcp_format import format_tool_result
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
 logger = structlog.get_logger()
 settings = get_settings()
+
+
+def strip_tool_trigger(prompt: str, trigger: str) -> str:
+    return re.sub(re.escape(trigger), "", prompt, count=1, flags=re.IGNORECASE).strip()
 
 
 async def call_mcp_tool(tool_name: str, arguments: dict) -> str | None:
@@ -43,7 +50,7 @@ async def call_mcp_tool(tool_name: str, arguments: dict) -> str | None:
                 for item in result.content:
                     text = getattr(item, "text", None)
                     blocks.append(text if text else str(item))
-                return "\n".join(blocks)
+                return format_tool_result(tool_name, "\n".join(blocks))
     except Exception as e:
         logger.warning("mcp_tool_call_failed", tool=tool_name, error=str(e))
         return None
@@ -58,7 +65,7 @@ MCP_TOOL_TRIGGERS = [
     (
         "@docs",
         "search_internal_docs",
-        lambda prompt: {"query": prompt.replace("@docs", "").strip(), "k": 3},
+        lambda prompt: {"query": strip_tool_trigger(prompt, "@docs"), "k": 3},
     ),
     (
         "@budget",

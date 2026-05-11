@@ -2,7 +2,7 @@
 
 ## 1. Dashboard Overview
 
-Open `http://localhost:5173/`. Point out cost today, requests today, cache hit rate, p95 latency, model usage, playground, and the audit log.
+Open `http://localhost:3000/`. Point out cost today, requests today, cache hit rate, p95 latency, model usage, playground, and the audit log.
 
 ## 2. Normal Prompt
 

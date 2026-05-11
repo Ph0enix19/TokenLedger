@@ -33,6 +33,8 @@ services:
       - postgres
     ports:
       - "8001:8001"
+    volumes:
+      - ./corpus:/app/corpus:ro
     environment:
       DATABASE_URL: postgresql://tokenledger:tokenledger@postgres:5432/tokenledger
 

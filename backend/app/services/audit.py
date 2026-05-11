@@ -26,6 +26,7 @@ async def log_request(
     """
     pii_flags = pii_flags or []
     prompt_redacted = prompt_redacted or prompt
+    model_used = trace.model_used or ("blocked" if outcome == "blocked" else "unrouted")
 
     try:
         async with get_db() as conn:
@@ -40,7 +41,7 @@ async def log_request(
                 """,
                 (
                     _hash_prompt(prompt),
-                    trace.model_used or "unknown",
+                    model_used,
                     trace.input_tokens,
                     trace.output_tokens,
                     trace.cost_myr,
