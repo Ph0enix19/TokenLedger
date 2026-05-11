@@ -23,7 +23,7 @@ import ollama
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://tokenledger:tokenledger@localhost:5433/tokenledger"
+    "postgresql://tokenledger:tokenledger@localhost:15433/tokenledger"
 )
 CORPUS_DIR = os.path.join(os.path.dirname(__file__), "..", "corpus")
 

@@ -15,6 +15,7 @@ Run: python mcp_server/server.py
 Port: 8001 (streamable-http transport)
 """
 import os
+import re
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 import psycopg
@@ -26,7 +27,7 @@ logger = structlog.get_logger()
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://tokenledger:tokenledger@127.0.0.1:5433/tokenledger",
+    "postgresql://tokenledger:tokenledger@127.0.0.1:15433/tokenledger",
 )
 
 mcp = FastMCP(
@@ -75,6 +76,22 @@ TEAM_BUDGETS = {
     "product": 200.0,
     "data": 300.0,
     "default": 100.0,
+}
+
+STOP_WORDS = {
+    "a",
+    "an",
+    "are",
+    "did",
+    "for",
+    "is",
+    "me",
+    "of",
+    "the",
+    "this",
+    "to",
+    "we",
+    "what",
 }
 
 
@@ -149,17 +166,46 @@ async def search_internal_docs(query: str, k: int = 3) -> list[DocHit]:
     Use this for questions about company policy, on-call, expenses, or deployments.
     """
     logger.info("mcp.search_internal_docs", query=query)
+    keywords = [
+        word
+        for word in re.findall(r"[a-z0-9]+", query.lower())
+        if len(word) > 2 and word not in STOP_WORDS
+    ]
 
     conn = _db()
     try:
-        cur = conn.execute(
-            """
-            SELECT source, chunk FROM documents
-            WHERE LOWER(chunk) LIKE %s
-            LIMIT %s
-            """,
-            (f"%{query.lower()}%", k),
-        )
+        if keywords:
+            where_parts = []
+            score_parts = []
+            where_params = []
+            score_params = []
+            for keyword in keywords:
+                pattern = f"%{keyword}%"
+                where_parts.append("(LOWER(source) LIKE %s OR LOWER(chunk) LIKE %s)")
+                score_parts.append(
+                    "(CASE WHEN LOWER(source) LIKE %s OR LOWER(chunk) LIKE %s THEN 1 ELSE 0 END)"
+                )
+                where_params.extend([pattern, pattern])
+                score_params.extend([pattern, pattern])
+
+            cur = conn.execute(
+                f"""
+                SELECT source, chunk FROM documents
+                WHERE {" OR ".join(where_parts)}
+                ORDER BY {" + ".join(score_parts)} DESC, source ASC
+                LIMIT %s
+                """,
+                (*where_params, *score_params, k),
+            )
+        else:
+            cur = conn.execute(
+                """
+                SELECT source, chunk FROM documents
+                WHERE LOWER(chunk) LIKE %s
+                LIMIT %s
+                """,
+                (f"%{query.lower()}%", k),
+            )
         rows = cur.fetchall()
     finally:
         conn.close()

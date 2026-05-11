@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: tokenledger
+      POSTGRES_PASSWORD: tokenledger
+      POSTGRES_DB: tokenledger
+    ports:
+      - "15433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      - postgres
+      - mcp-server
+    ports:
+      - "8000:8000"
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      API_KEY: ${API_KEY:-dev-secret-key-123}
+      DATABASE_URL: postgresql://tokenledger:tokenledger@postgres:5432/tokenledger
+      FALLBACK_TO_SQLITE: "false"
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      MCP_SERVER_URL: http://mcp-server:8001
+
+  mcp-server:
+    build:
+      context: ./mcp_server
+    depends_on:
+      - postgres
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://tokenledger:tokenledger@postgres:5432/tokenledger
+
+volumes:
+  postgres_data:
