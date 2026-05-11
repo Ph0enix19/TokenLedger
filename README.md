@@ -240,7 +240,7 @@ For hosted backends, do not point `MCP_SERVER_URL` at `127.0.0.1` unless the MCP
 - The demo API key is suitable for local demos only. Production should use real user auth and scoped backend tokens.
 - The frontend currently shows operational data from existing backend endpoints; richer drill-down views can be added as backend analytics expand.
 
-## Demo Talking Points
+## Important Points
 
 - TokenLedger turns scattered LLM calls into a governed gateway.
 - PII scanning happens before model calls.
