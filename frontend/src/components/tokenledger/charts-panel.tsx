@@ -95,7 +95,7 @@ export default function ChartsPanel({ modelUsage, timeseries, loading }: ChartsP
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       {/* Model Usage Chart */}
-      <div className="tl-panel overflow-hidden rounded-2xl">
+      <div className="tl-panel flex h-full flex-col overflow-hidden rounded-2xl">
         <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-0">
           <div>
             <div className="flex items-center gap-2">
@@ -110,7 +110,7 @@ export default function ChartsPanel({ modelUsage, timeseries, loading }: ChartsP
             {modelTotal} requests
           </span>
         </div>
-        <div className="px-2 pb-4 pt-2 h-64">
+        <div className="h-64 flex-1 px-2 pb-4 pt-2">
           {loading ? (
             <div className="mx-3 h-full animate-pulse rounded-xl bg-slate-200/70 dark:bg-slate-800/30" />
           ) : modelTotal > 0 ? (
@@ -163,7 +163,7 @@ export default function ChartsPanel({ modelUsage, timeseries, loading }: ChartsP
       </div>
 
       {/* Cost Trend Chart */}
-      <div className="tl-panel overflow-hidden rounded-2xl">
+      <div className="tl-panel flex h-full flex-col overflow-hidden rounded-2xl">
         <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-0">
           <div>
             <div className="flex items-center gap-2">
@@ -178,7 +178,7 @@ export default function ChartsPanel({ modelUsage, timeseries, loading }: ChartsP
             7 days
           </span>
         </div>
-        <div className="px-2 pb-4 pt-2 h-64">
+        <div className="h-64 flex-1 px-2 pb-4 pt-2">
           {loading ? (
             <div className="mx-3 h-full animate-pulse rounded-xl bg-slate-200/70 dark:bg-slate-800/30" />
           ) : hasCostData ? (
@@ -202,7 +202,7 @@ export default function ChartsPanel({ modelUsage, timeseries, loading }: ChartsP
                   tickLine={false}
                   axisLine={false}
                   width={48}
-                  tickFormatter={(value) => `RM ${Number(value).toFixed(2)}`}
+                  tickFormatter={(value) => formatCost(Number(value))}
                 />
                 <Tooltip
                   contentStyle={tooltipStyle}

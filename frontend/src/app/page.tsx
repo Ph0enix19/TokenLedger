@@ -124,6 +124,7 @@ function statusFromReady(payload: Record<string, unknown>): EndpointStatus {
 }
 
 function formatCostToday(value: number) {
+  if (value === 0) return "RM 0";
   if (value < 0.01) return `RM ${value.toFixed(6)}`;
   return `RM ${value.toFixed(2)}`;
 }
@@ -475,31 +476,31 @@ export default function TokenLedgerDashboard() {
               />
             </section>
 
-            <section className="grid scroll-mt-5 gap-5 xl:grid-cols-[430px_minmax(0,1fr)]" id="playground">
-              <aside className="grid min-w-0 content-start gap-5">
+            <section className="grid scroll-mt-5 gap-5 lg:grid-cols-2 xl:grid-cols-3" id="playground">
+              <div className="min-w-0">
                 <ChatPlayground latest={latestInteraction} onSettled={handleChatSettled} />
-                <div id="trace" className="scroll-mt-5">
-                  <PipelineTrace latest={latestInteraction} auditConfirmed={auditConfirmed} />
-                </div>
-              </aside>
-
-              <div className="grid min-w-0 content-start gap-5">
-                <div id="audit" className="scroll-mt-5">
-                  <AuditLogTable
-                    rows={auditRows}
-                    loading={isLoadingInitial}
-                    selectedId={selectedAuditRow?.id ?? null}
-                    onSelect={(row) => {
-                      setSelectedAuditId(row.id);
-                      setActiveSection("audit");
-                    }}
-                    lastUpdated={stats.last_updated || lastRefreshed}
-                  />
-                </div>
-                <div id="security" className="scroll-mt-5">
-                  <RequestDetailPanel row={selectedAuditRow} latest={latestInteraction} />
-                </div>
               </div>
+
+              <div id="trace" className="min-w-0 scroll-mt-5">
+                <PipelineTrace latest={latestInteraction} auditConfirmed={auditConfirmed} />
+              </div>
+
+              <div id="security" className="min-w-0 scroll-mt-5">
+                <RequestDetailPanel row={selectedAuditRow} latest={latestInteraction} />
+              </div>
+            </section>
+
+            <section id="audit" className="scroll-mt-5">
+              <AuditLogTable
+                rows={auditRows}
+                loading={isLoadingInitial}
+                selectedId={selectedAuditRow?.id ?? null}
+                onSelect={(row) => {
+                  setSelectedAuditId(row.id);
+                  setActiveSection("audit");
+                }}
+                lastUpdated={stats.last_updated || lastRefreshed}
+              />
             </section>
 
             <section className="tl-soft mb-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3">

@@ -25,6 +25,7 @@ function formatDateTime(value: string | null | undefined) {
 
 function formatCost(value: number | null | undefined) {
   if (typeof value !== "number") return "—";
+  if (value === 0) return "RM 0";
   if (value < 0.01) return `RM ${value.toFixed(6)}`;
   return `RM ${value.toFixed(2)}`;
 }
@@ -88,7 +89,7 @@ export default function RequestDetailPanel({ row, latest }: RequestDetailPanelPr
   }
 
   return (
-    <div className="tl-panel overflow-hidden rounded-2xl">
+    <div className="tl-panel flex h-full flex-col overflow-hidden rounded-2xl">
       <div className="tl-panel-header flex items-center justify-between gap-3 px-5 py-3.5">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-500/10 ring-1 ring-[var(--tl-border)]">

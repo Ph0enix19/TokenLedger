@@ -34,6 +34,7 @@ const presets = [
 
 function formatCost(value: number | undefined) {
   if (typeof value !== "number") return "RM 0";
+  if (value === 0) return "RM 0";
   if (value < 0.01) return `RM ${value.toFixed(6)}`;
   return `RM ${value.toFixed(2)}`;
 }
@@ -101,7 +102,7 @@ export default function ChatPlayground({ latest, onSettled }: ChatPlaygroundProp
   const piiFlags = trace?.pii_flags ?? [];
 
   return (
-    <div className="tl-panel overflow-hidden rounded-2xl">
+    <div className="tl-panel flex h-full flex-col overflow-hidden rounded-2xl">
       <div className="tl-panel-header flex items-center justify-between gap-3 px-5 py-3.5">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 ring-1 ring-violet-500/24">
@@ -115,7 +116,7 @@ export default function ChatPlayground({ latest, onSettled }: ChatPlaygroundProp
         <Badge variant="outline">X-API-Key</Badge>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="flex-1 space-y-3 p-4">
         {/* Preset Chips */}
         <div className="flex flex-wrap gap-1">
           {presets.map((preset) => {

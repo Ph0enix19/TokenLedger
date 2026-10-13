@@ -3,6 +3,7 @@ backend/*-live.*.log
 mcp_server/*-server.*.log
 mcp_server/*-live.*.log
 frontend/*-server.*.log
+*.log
 
 # Environment files
 .env
