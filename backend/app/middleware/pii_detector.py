@@ -1,6 +1,6 @@
 """
 PII and secret detection middleware.
-Six patterns targeting the most common enterprise data leakage risks.
+Patterns target the most common enterprise data leakage risks.
 Design choice: precision over recall — we prefer false negatives to false positives
 in a dev gateway. Production would use Microsoft Presidio.
 """
@@ -43,7 +43,36 @@ _PATTERNS: list[tuple[str, re.Pattern, str]] = [
     ),
     (
         "API_KEY",
-        re.compile(r"sk-[A-Za-z0-9]{20,}"),
+        re.compile(r"\b(?:sk|sk-proj)-[A-Za-z0-9_\-]{20,}\b"),
+        "[API_KEY]",
+    ),
+    (
+        "GROQ_API_KEY",
+        re.compile(r"\bgsk_[A-Za-z0-9]{20,}\b"),
+        "[API_KEY]",
+    ),
+    (
+        "GATEWAY_API_KEY",
+        re.compile(r"\b(?:dev|test|stage|staging|prod|local)-secret-key-\d+\b", re.IGNORECASE),
+        "[API_KEY]",
+    ),
+    (
+        "LABELED_SECRET",
+        re.compile(
+            r"\b(?:api[_\-\s]?key|secret[_\-\s]?key|access[_\-\s]?token|bearer[_\-\s]?token|token)"
+            r"\s*(?:is|=|:)\s*[A-Za-z0-9][A-Za-z0-9._\-]{10,}\b",
+            re.IGNORECASE,
+        ),
+        "[API_KEY]",
+    ),
+    (
+        "LABELED_SECRET",
+        re.compile(
+            r"\b[A-Za-z0-9][A-Za-z0-9._\-]{10,}\s+"
+            r"(?:is|as)\s+(?:my|our|the|an?)?\s*"
+            r"(?:api[_\-\s]?key|secret[_\-\s]?key|access[_\-\s]?token|bearer[_\-\s]?token|token)\b",
+            re.IGNORECASE,
+        ),
         "[API_KEY]",
     ),
 ]

@@ -66,6 +66,12 @@ function toolName(tool: ToolCall) {
   return tool.tool ?? tool.name ?? "tool";
 }
 
+function formatCost(value: number | null | undefined) {
+  if (typeof value !== "number" || value === 0) return "RM 0";
+  if (value < 0.01) return `RM ${value.toFixed(6)}`;
+  return `RM ${value.toFixed(2)}`;
+}
+
 function blockedTrace(latest: Extract<ChatInteraction, { status: "blocked" }>): ChatTrace {
   return {
     pii_detected: true,
@@ -114,7 +120,7 @@ function buildStages(latest: ChatInteraction, auditConfirmed: boolean): { stages
       { title: "Cache Lookup", detail: isCacheHit ? "Hit." : "Miss.", status: isCacheHit ? "cache hit" : "passed", icon: Database, emphasis: isCacheHit ? "cache" : undefined },
       { title: "Router", detail: isCacheHit ? "Bypassed." : isLargeRoute ? "Large model." : "Small model.", status: isCacheHit ? "skipped" : "passed", icon: Route, emphasis: isLargeRoute && !isCacheHit ? "router" : undefined },
       { title: "LLM Response", detail: isCacheHit ? "Cached." : `${modelUsed}.`, status: isCacheHit ? "cache hit" : "passed", icon: Network, emphasis: isCacheHit ? "cache" : undefined },
-      { title: "Cost", detail: isCacheHit ? "Free." : `RM ${(trace.cost_myr ?? 0).toFixed(6)}`, status: isCacheHit ? "skipped" : "passed", icon: Calculator },
+      { title: "Cost", detail: isCacheHit ? "Free." : formatCost(trace.cost_myr), status: isCacheHit ? "skipped" : "passed", icon: Calculator },
       { title: "Audit", detail: auditConfirmed ? "Logged." : "Pending.", status: latest.response.request_id || auditConfirmed ? "passed" : "skipped", icon: FileClock },
     ],
   };
@@ -150,7 +156,7 @@ export default function PipelineTrace({ latest, auditConfirmed }: PipelineTraceP
   const tools = trace.tool_calls ?? [];
 
   return (
-    <div className="tl-panel overflow-hidden rounded-2xl">
+    <div className="tl-panel flex h-full flex-col overflow-hidden rounded-2xl">
       <div className="tl-panel-header flex items-center justify-between gap-3 px-5 py-3.5">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-500/10 ring-1 ring-[var(--tl-border)]">

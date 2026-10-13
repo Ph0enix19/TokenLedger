@@ -22,6 +22,7 @@ function formatTime(value: string | null) {
 
 function formatCost(value: number | null) {
   if (typeof value !== "number") return "-";
+  if (value === 0) return "RM 0";
   if (value < 0.01) return `RM ${value.toFixed(6)}`;
   return `RM ${value.toFixed(2)}`;
 }

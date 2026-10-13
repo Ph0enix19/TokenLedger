@@ -32,6 +32,36 @@ def test_detects_api_key():
     assert "API_KEY" in names
 
 
+def test_detects_groq_api_key():
+    prompt = "token = gsk_abcdefghijklmnopqrstuvwxyzABCDE12345"
+    _, matches = detect_and_redact(prompt)
+    names = [m.pattern_name for m in matches]
+    assert "GROQ_API_KEY" in names
+
+
+def test_detects_gateway_demo_api_key():
+    prompt = "dev-secret-key-123"
+    redacted, matches = detect_and_redact(prompt)
+    names = [m.pattern_name for m in matches]
+    assert "GATEWAY_API_KEY" in names
+    assert "dev-secret-key-123" not in redacted
+
+
+def test_detects_value_labeled_as_api_key():
+    prompt = "dev-secret-key-123 is my api key"
+    redacted, matches = detect_and_redact(prompt)
+    names = [m.pattern_name for m in matches]
+    assert "GATEWAY_API_KEY" in names
+    assert "[API_KEY]" in redacted
+
+
+def test_api_key_policy_question_passes():
+    prompt = "Summarize the API key rotation policy"
+    redacted, matches = detect_and_redact(prompt)
+    assert matches == []
+    assert redacted == prompt
+
+
 def test_clean_prompt_passes():
     prompt = "Summarize the Q3 OKRs for the engineering team"
     redacted, matches = detect_and_redact(prompt)

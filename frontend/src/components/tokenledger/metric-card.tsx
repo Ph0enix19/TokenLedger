@@ -49,7 +49,7 @@ export default function MetricCard({ icon: Icon, label, value, detail, trend, to
   const style = toneStyles[tone];
 
   return (
-    <div className={`tl-panel group relative overflow-hidden rounded-2xl p-5 transition-all duration-300 hover:border-[var(--tl-border-strong)] ${style.shadow}`}>
+    <div className={`tl-panel group relative flex h-full flex-col overflow-hidden rounded-2xl p-5 transition-all duration-300 hover:border-[var(--tl-border-strong)] ${style.shadow}`}>
       <div className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r ${style.accent}`} />
       <div className={`absolute inset-x-0 top-0 h-16 bg-gradient-to-b ${style.accent} opacity-30 pointer-events-none`} />
 
