@@ -1,85 +1,116 @@
 # TokenLedger
 
-TokenLedger is an AI gateway and observability dashboard for governed LLM usage. Applications send prompts to one FastAPI endpoint, and TokenLedger handles API-key checks, PII blocking, model routing, semantic cache lookup, optional MCP tool context, cost calculation, and audit logging before returning a response.
+TokenLedger is an AI gateway and observability dashboard for governed LLM usage. Applications send prompts through one FastAPI endpoint, and TokenLedger adds API-key checks, PII blocking, heuristic model routing, semantic cache lookup, optional MCP tool context, cost calculation, and audit logging before returning a response.
 
-The project includes a polished Next.js dashboard for live operations: gateway status, spend, latency, model routing, cache behavior, policy outcomes, request traces, and audit evidence.
+## Why I Built This
+
+AI apps can become expensive and hard to audit when every feature calls model APIs directly. TokenLedger explores a control-plane approach: route requests through one gateway so teams can see cost, latency, model choice, cache behavior, sensitive-data blocks, and internal-tool context in one place.
 
 ## Features
 
-- FastAPI gateway on port `8000` with `POST /v1/chat`.
-- API-key protection through the `X-API-Key` header.
+- FastAPI gateway with `POST /v1/chat`.
+- API-key protection through `X-API-Key`.
 - PII and secret detection before model calls.
-- Model routing between small and large Groq models.
-- Semantic cache hooks backed by Postgres and pgvector.
-- MCP server on port `8001` for governed internal tools:
-  - `@cost` calls `get_cost_summary`
-  - `@docs` calls `search_internal_docs`
-  - `@budget` calls `check_budget_limit`
-- Audit log and dashboard metrics:
-  - `GET /v1/audit?limit=20`
-  - `GET /v1/dashboard/stats`
-  - `GET /v1/dashboard/timeseries?metric=cost&days=7`
-- Next.js dashboard with:
-  - Collapsible responsive sidebar
-  - Backend and database readiness indicators
-  - Cost, request, cache, and latency metric cards
-  - Model usage and cost trend charts
-  - Chat playground
-  - Pipeline trace
-  - Audit table and request detail panel
-  - Light and dark themes with persisted preference
+- Blocked requests are logged and returned as HTTP 400.
+- Heuristic model routing between small and large Groq models.
+- Groq LLM calls with token usage and latency capture.
+- Cost calculation in MYR from input/output tokens.
+- Postgres request log and audit log.
+- Semantic cache hooks using Ollama `nomic-embed-text` embeddings and `cache_entries`.
+- MCP tool context triggered by:
+  - `@cost` for trailing cost summaries
+  - `@docs` for internal document search
+  - `@budget` for budget status
+- Next.js dashboard with status cards, model/cost charts, chat playground, pipeline trace, audit table, request details, and light/dark themes.
+- Docker Compose setup for Postgres with pgvector.
 
 ## Tech Stack
 
-Backend:
+- **Backend:** Python, FastAPI, Pydantic, psycopg3, psycopg-pool, structlog, Groq SDK
+- **Database:** PostgreSQL with pgvector
+- **Cache / embeddings:** Ollama `nomic-embed-text`, cosine similarity, `cache_entries`
+- **MCP:** MCP Python SDK with a streamable HTTP server
+- **Frontend:** Next.js App Router, React 19, TypeScript, Tailwind CSS v4, Recharts, lucide-react
+- **Infrastructure:** Docker Compose, manual SQL migration
+- **Tests:** pytest tests for PII detection, docs search, and MCP formatting
 
-- FastAPI
-- psycopg3 and psycopg-pool
-- Postgres with pgvector
-- Groq LLM API
-- Ollama embeddings at `http://localhost:11434`
-- MCP Python SDK
+## My Role / Contribution
 
-Frontend:
+The repo shows backend gateway work, MCP tooling, Postgres schema, Next.js dashboard, and tests. The exact individual contribution split is not visible from code alone.
 
-- Next.js App Router
-- React and TypeScript
-- Tailwind CSS v4
-- Recharts
-- Lucide icons
-- Next API routes as a backend-for-frontend proxy
+- [TODO: clarify whether TokenLedger is solo work or team work]
+- [TODO: clarify your strongest ownership areas: gateway, dashboard, MCP, cache, database, tests, or architecture]
 
-## Architecture
+## Project Structure
 
-```mermaid
-flowchart LR
-  A[Next.js Dashboard] --> B[Next API Proxy]
-  B --> C[FastAPI Gateway]
-  C --> D[PII Detector]
-  D --> E[Semantic Cache and Router]
-  E --> F[Groq LLM]
-  E --> G[MCP Server]
-  G --> H[Postgres + pgvector]
-  E --> I[Ollama Embeddings]
-  C --> H
+```text
+TokenLedger/
+|-- README.md
+|-- .env.example
+|-- docker-compose.yml
+|-- docker-compose.full.yml
+|-- migrations/
+|   `-- 001_init.sql
+|-- backend/
+|   |-- Dockerfile
+|   |-- requirements.txt
+|   |-- run.py
+|   |-- app/
+|   |   |-- main.py
+|   |   |-- config.py
+|   |   |-- db.py
+|   |   |-- routes/
+|   |   |-- services/
+|   |   `-- middleware/
+|   `-- tests/
+|-- frontend/
+|   |-- package.json
+|   |-- .env.example
+|   `-- src/
+|       |-- app/
+|       |-- components/tokenledger/
+|       |-- lib/
+|       `-- types/
+|-- mcp_server/
+|   |-- Dockerfile
+|   |-- server.py
+|   |-- docs_search.py
+|   `-- requirements.txt
+`-- corpus/
 ```
 
-The dashboard does not call the FastAPI API key directly from browser code. It calls `frontend/src/app/api/tokenledger/*`; those server-side Next routes forward requests to the backend and inject `TOKENLEDGER_API_KEY`.
+## Getting Started
 
-## Ports
+### Prerequisites
 
-- Next.js dashboard: `3000`
-- FastAPI gateway: `8000`
-- MCP server: `8001`
-- Postgres host port: `15433`
-- Ollama default: `11434`
+- Python 3.11+ [TODO: clarify exact supported Python version]
+- Node.js 20+ [TODO: clarify exact supported Node version for Next 16]
+- Docker Desktop
+- Groq API key
+- Optional Ollama with `nomic-embed-text` pulled for semantic cache behavior
 
-## Environment Variables
+### Installation
 
-Backend `.env`:
+Clone the repository:
+
+```bash
+git clone https://github.com/Ph0enix19/TokenLedger.git
+cd TokenLedger
+```
+
+Create backend and frontend env files:
+
+```powershell
+Copy-Item .env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env.local
+```
+
+### Environment Variables
+
+Backend:
 
 ```env
-GROQ_API_KEY=your-groq-key
+GROQ_API_KEY=your_groq_key_here
 DATABASE_URL=postgresql://tokenledger:tokenledger@localhost:15433/tokenledger
 FALLBACK_TO_SQLITE=false
 ENVIRONMENT=development
@@ -87,59 +118,48 @@ API_KEY=dev-secret-key-123
 MCP_SERVER_URL=http://127.0.0.1:8001
 ```
 
-Frontend `.env.local`:
+Frontend:
 
 ```env
 TOKENLEDGER_BACKEND=http://127.0.0.1:8000
 TOKENLEDGER_API_KEY=dev-secret-key-123
 ```
 
-Keep `TOKENLEDGER_API_KEY` server-side. The current dashboard uses Next API routes so the demo key is not exposed through client-side environment variables.
+Keep `TOKENLEDGER_API_KEY` server-side. The Next.js frontend uses API routes as a backend-for-frontend proxy so the browser does not call the FastAPI key directly.
 
-## Local Setup
+### Run Locally
 
-1. Create env files:
-
-```powershell
-Copy-Item .env.example backend/.env
-Copy-Item frontend/.env.example frontend/.env.local
-```
-
-2. Edit `backend/.env` and set a real `GROQ_API_KEY`.
-
-3. Start Postgres:
+Start Postgres:
 
 ```powershell
 docker compose up -d
 ```
 
-4. Apply the database schema if needed:
+Apply the schema:
 
 ```powershell
 docker compose cp migrations/001_init.sql postgres:/tmp/001_init.sql
 docker compose exec -T postgres psql -U tokenledger -d tokenledger -f /tmp/001_init.sql
 ```
 
-5. Start the MCP server:
+Start the MCP server:
 
 ```powershell
 $env:DATABASE_URL="postgresql://tokenledger:tokenledger@localhost:15433/tokenledger"
 python mcp_server/server.py
 ```
 
-6. Start the backend:
+Start the backend:
 
 ```powershell
 cd backend
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-$env:GROQ_API_KEY="YOUR_GROQ_KEY"
-$env:API_KEY="dev-secret-key-123"
-$env:DATABASE_URL="postgresql://tokenledger:tokenledger@localhost:15433/tokenledger"
-$env:MCP_SERVER_URL="http://127.0.0.1:8001"
+pip install -r requirements.txt
 python run.py
 ```
 
-7. Start the frontend:
+Start the frontend:
 
 ```powershell
 cd frontend
@@ -149,101 +169,38 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-## Frontend Commands
-
-Run these from `frontend/`:
-
-```powershell
-npm install
-npm run dev
-npm run build
-npm run preview
-npm run lint
-```
-
-`npm run dev` starts Next.js on `http://localhost:3000`. `npm run build` creates a production build. `npm run preview` runs the built app with `next start` after a successful build.
-
-## Backend Smoke Commands
-
-Health:
+Quick backend checks:
 
 ```powershell
 Invoke-RestMethod "http://127.0.0.1:8000/health"
-```
-
-Readiness:
-
-```powershell
 Invoke-RestMethod "http://127.0.0.1:8000/ready"
-```
-
-Dashboard stats:
-
-```powershell
 Invoke-RestMethod "http://127.0.0.1:8000/v1/dashboard/stats"
 ```
 
-PII block:
+## Screenshots / Demo
 
-```powershell
-$headers = @{ "X-API-Key" = "dev-secret-key-123" }
-$body = @{
-  prompt = "my email is test@example.com"
-  user_id = "demo"
-  max_tokens = 80
-} | ConvertTo-Json
+- [TODO: add dashboard overview screenshot]
+- [TODO: add chat playground and pipeline trace screenshot]
+- [TODO: add audit log screenshot]
+- [TODO: add deployment link if hosted]
 
-Invoke-RestMethod `
-  -Uri "http://127.0.0.1:8000/v1/chat" `
-  -Method POST `
-  -Headers $headers `
-  -ContentType "application/json" `
-  -Body $body
-```
+## Current Status
 
-## Theme Support
+MVP / infrastructure prototype. The gateway, dashboard, audit endpoints, MCP triggers, and Postgres schema are present. The model router is heuristic, migrations are manual SQL, MCP failures are intentionally non-fatal, and the semantic cache depends on local Ollama by default.
 
-The dashboard supports polished light and dark themes:
+## Future Improvements
 
-- The initial theme respects the operating system preference.
-- A visible theme toggle is available in the header.
-- User preference is saved to `localStorage` as `tokenledger-theme`.
-- Theme tokens are defined in `frontend/src/app/globals.css`.
-- Cards, tables, forms, badges, charts, sidebar, and headers are theme-aware.
+- Add GitHub Actions for backend tests, frontend lint/build, and dependency checks.
+- Add a migration runner instead of manual SQL commands.
+- Add production authentication and scoped API tokens instead of a demo API key.
+- Add indexed pgvector search for cache lookup at larger scale.
+- Add richer analytics for per-user, per-team, and per-project cost views.
+- Add hosted deployment docs for backend, MCP server, Postgres, and frontend.
+- Add screenshots and demo video.
 
-## Screenshots
+## What I Learned
 
-Add current screenshots here after running the local dashboard:
-
-- Dashboard overview
-- Chat playground and pipeline trace
-- Audit log table
-- Light mode
-- Dark mode
-
-## Deployment Notes
-
-Backend services can be deployed separately from the frontend. For a hosted frontend, set:
-
-```env
-TOKENLEDGER_BACKEND=https://your-backend-url
-TOKENLEDGER_API_KEY=your-server-side-demo-key
-```
-
-For hosted backends, do not point `MCP_SERVER_URL` at `127.0.0.1` unless the MCP server runs in the same environment. Deploy MCP separately and set a reachable URL.
-
-## Known Limitations and Future Improvements
-
-- Migrations are manual SQL files; there is no migration runner yet.
-- MCP failures are intentionally non-fatal, so tool context may be skipped when MCP is unavailable.
-- Ollama is local by default; hosted semantic cache and corpus indexing need a reachable embedding service.
-- The demo API key is suitable for local demos only. Production should use real user auth and scoped backend tokens.
-- The frontend currently shows operational data from existing backend endpoints; richer drill-down views can be added as backend analytics expand.
-
-## Important Points
-
-- TokenLedger turns scattered LLM calls into a governed gateway.
-- PII scanning happens before model calls.
-- Cost, latency, cache, model choice, and MCP tool calls are visible in the request trace.
-- Audit rows prove both allowed and blocked outcomes.
-- The dashboard is built for live infrastructure demos, not static screenshots.
+- How to design an AI gateway as a control point for model calls.
+- How cost, latency, cache behavior, and model routing can be made auditable.
+- How PII checks can block risky prompts before they reach an LLM provider.
+- How MCP tools can add governed internal context without exposing database credentials to the model.
